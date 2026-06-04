@@ -4,6 +4,7 @@
   "description": "A simple JavaScript BMI calculator.",
   "main": "index.js",
   "scripts": {
+    "web": "node server.js",
     "start": "node index.js"
   },
   "keywords": [

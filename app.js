@@ -21,6 +21,14 @@ const poundsValue = document.querySelector("#pounds-value");
 const metersValue = document.querySelector("#meters-value");
 const visualLabel = document.querySelector("#visual-label");
 const visualMessage = document.querySelector("#visual-message");
+const cameraVideo = document.querySelector("#camera-video");
+const cameraCanvas = document.querySelector("#camera-canvas");
+const cameraStatus = document.querySelector("#camera-status");
+const cameraPreview = document.querySelector(".camera-preview");
+const facePhoto = document.querySelector("#face-photo");
+const startCameraButton = document.querySelector("#start-camera");
+const takePhotoButton = document.querySelector("#take-photo");
+const clearPhotoButton = document.querySelector("#clear-photo");
 
 const categories = {
   underweight: {
@@ -50,6 +58,8 @@ const categories = {
 };
 
 let previousHeightUnit = heightUnitInput.value;
+let cameraStream = null;
+let hasCapturedPhoto = false;
 
 function convertWeightToKg(weight, unit) {
   if (unit === "g") {
@@ -133,10 +143,275 @@ function readNonNegativeNumber(input) {
 function updatePerson(categoryKey) {
   const category = categories[categoryKey];
   const genderClass = genderInput.value === "female" ? "person-female" : "person-male";
+  const photoClass = hasCapturedPhoto ? "person-has-photo" : "";
 
-  person.className = `person ${category.className} ${genderClass}`;
+  person.className = `person ${category.className} ${genderClass} ${photoClass}`.trim();
   visualLabel.textContent = category.visual;
   visualMessage.textContent = category.message;
+}
+
+function setCameraStatus(message) {
+  cameraStatus.textContent = message;
+}
+
+function stopCamera() {
+  if (cameraStream !== null) {
+    cameraStream.getTracks().forEach((track) => track.stop());
+  }
+
+  cameraStream = null;
+  cameraVideo.srcObject = null;
+  cameraPreview.classList.remove("is-active");
+  startCameraButton.disabled = false;
+  takePhotoButton.disabled = true;
+}
+
+async function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setCameraStatus("Camera access is not available in this browser.");
+    return;
+  }
+
+  try {
+    stopCamera();
+    setCameraStatus("Opening camera...");
+    startCameraButton.disabled = true;
+
+    cameraStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        width: { ideal: 640 },
+        height: { ideal: 640 },
+      },
+      audio: false,
+    });
+
+    cameraVideo.srcObject = cameraStream;
+    cameraPreview.classList.add("is-active");
+    takePhotoButton.disabled = false;
+    setCameraStatus("Camera ready.");
+  } catch (error) {
+    stopCamera();
+    setCameraStatus("Camera permission was blocked or no camera was found.");
+  }
+}
+
+function clampColor(value) {
+  return Math.max(0, Math.min(255, value));
+}
+
+function quantizeSoft(value) {
+  return Math.round(value / 24) * 24;
+}
+
+function softenPortrait(context, width, height) {
+  const source = context.getImageData(0, 0, width, height);
+  const sourcePixels = source.data;
+  const painted = context.createImageData(width, height);
+  const paintedPixels = painted.data;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      let red = 0;
+      let green = 0;
+      let blue = 0;
+      let count = 0;
+
+      for (let offsetY = -2; offsetY <= 2; offsetY += 1) {
+        for (let offsetX = -2; offsetX <= 2; offsetX += 1) {
+          const sampleX = Math.max(0, Math.min(width - 1, x + offsetX));
+          const sampleY = Math.max(0, Math.min(height - 1, y + offsetY));
+          const sampleIndex = (sampleY * width + sampleX) * 4;
+
+          red += sourcePixels[sampleIndex];
+          green += sourcePixels[sampleIndex + 1];
+          blue += sourcePixels[sampleIndex + 2];
+          count += 1;
+        }
+      }
+
+      const index = (y * width + x) * 4;
+      const averageRed = red / count;
+      const averageGreen = green / count;
+      const averageBlue = blue / count;
+      const warmth = y < height * 0.75 ? 18 : 8;
+
+      paintedPixels[index] = clampColor(quantizeSoft(averageRed * 1.1 + 20));
+      paintedPixels[index + 1] = clampColor(quantizeSoft(averageGreen * 1.04 + warmth));
+      paintedPixels[index + 2] = clampColor(quantizeSoft(averageBlue * 0.86 + 8));
+      paintedPixels[index + 3] = 255;
+    }
+  }
+
+  context.putImageData(painted, 0, 0);
+}
+
+function addSoftInkEdges(context, width, height) {
+  const image = context.getImageData(0, 0, width, height);
+  const pixels = image.data;
+  const luminance = new Uint8ClampedArray(width * height);
+
+  for (let index = 0; index < pixels.length; index += 4) {
+    luminance[index / 4] = pixels[index] * 0.299 + pixels[index + 1] * 0.587 + pixels[index + 2] * 0.114;
+  }
+
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const pixelIndex = y * width + x;
+      const edge =
+        Math.abs(luminance[pixelIndex - 1] - luminance[pixelIndex + 1]) +
+        Math.abs(luminance[pixelIndex - width] - luminance[pixelIndex + width]);
+
+      if (edge > 34) {
+        const index = pixelIndex * 4;
+        pixels[index] = pixels[index] * 0.66;
+        pixels[index + 1] = pixels[index + 1] * 0.61;
+        pixels[index + 2] = pixels[index + 2] * 0.56;
+      }
+    }
+  }
+
+  context.putImageData(image, 0, 0);
+}
+
+function drawEllipse(context, x, y, radiusX, radiusY, fillStyle) {
+  context.beginPath();
+  context.ellipse(x, y, radiusX, radiusY, 0, 0, Math.PI * 2);
+  context.fillStyle = fillStyle;
+  context.fill();
+}
+
+function drawGhibliEye(context, x, y, width, height) {
+  context.save();
+  context.translate(x, y);
+  context.fillStyle = "rgba(255, 248, 232, 0.95)";
+  context.strokeStyle = "rgba(47, 36, 31, 0.86)";
+  context.lineWidth = width * 0.08;
+  context.beginPath();
+  context.ellipse(0, 0, width * 0.5, height * 0.5, -0.04, 0, Math.PI * 2);
+  context.fill();
+  context.stroke();
+
+  const iris = context.createRadialGradient(-width * 0.08, -height * 0.1, 1, 0, 0, width * 0.36);
+  iris.addColorStop(0, "#6f5846");
+  iris.addColorStop(0.62, "#2f241f");
+  iris.addColorStop(1, "#17110f");
+  context.fillStyle = iris;
+  context.beginPath();
+  context.ellipse(0, height * 0.04, width * 0.26, height * 0.34, 0, 0, Math.PI * 2);
+  context.fill();
+
+  drawEllipse(context, -width * 0.1, -height * 0.15, width * 0.1, height * 0.12, "rgba(255, 255, 255, 0.95)");
+  drawEllipse(context, width * 0.08, height * 0.07, width * 0.045, height * 0.055, "rgba(255, 255, 255, 0.72)");
+  context.restore();
+}
+
+function drawGhibliFeatures(context, width, height) {
+  context.save();
+  context.lineCap = "round";
+  context.lineJoin = "round";
+
+  const faceGlow = context.createRadialGradient(width * 0.5, height * 0.54, 8, width * 0.5, height * 0.56, width * 0.36);
+  faceGlow.addColorStop(0, "rgba(255, 224, 190, 0.18)");
+  faceGlow.addColorStop(1, "rgba(255, 224, 190, 0)");
+  context.fillStyle = faceGlow;
+  context.fillRect(0, 0, width, height);
+
+  drawEllipse(context, width * 0.33, height * 0.66, width * 0.085, height * 0.047, "rgba(246, 133, 123, 0.34)");
+  drawEllipse(context, width * 0.67, height * 0.66, width * 0.085, height * 0.047, "rgba(246, 133, 123, 0.34)");
+
+  context.strokeStyle = "rgba(54, 40, 34, 0.58)";
+  context.lineWidth = width * 0.018;
+  context.beginPath();
+  context.moveTo(width * 0.31, height * 0.48);
+  context.quadraticCurveTo(width * 0.39, height * 0.43, width * 0.47, height * 0.48);
+  context.moveTo(width * 0.53, height * 0.48);
+  context.quadraticCurveTo(width * 0.61, height * 0.43, width * 0.69, height * 0.48);
+  context.stroke();
+
+  drawGhibliEye(context, width * 0.4, height * 0.56, width * 0.145, height * 0.18);
+  drawGhibliEye(context, width * 0.6, height * 0.56, width * 0.145, height * 0.18);
+
+  context.strokeStyle = "rgba(118, 75, 60, 0.42)";
+  context.lineWidth = width * 0.018;
+  context.beginPath();
+  context.moveTo(width * 0.505, height * 0.59);
+  context.quadraticCurveTo(width * 0.485, height * 0.645, width * 0.525, height * 0.67);
+  context.stroke();
+
+  context.strokeStyle = "rgba(125, 54, 58, 0.78)";
+  context.lineWidth = width * 0.023;
+  context.beginPath();
+  context.moveTo(width * 0.42, height * 0.75);
+  context.quadraticCurveTo(width * 0.5, height * 0.805, width * 0.58, height * 0.75);
+  context.stroke();
+
+  context.strokeStyle = "rgba(255, 255, 246, 0.34)";
+  context.lineWidth = width * 0.024;
+  context.beginPath();
+  context.moveTo(width * 0.28, height * 0.3);
+  context.quadraticCurveTo(width * 0.2, height * 0.52, width * 0.27, height * 0.72);
+  context.stroke();
+
+  context.restore();
+}
+
+function stylizeGhibliPortrait(context, width, height) {
+  softenPortrait(context, width, height);
+  addSoftInkEdges(context, width, height);
+
+  context.globalCompositeOperation = "soft-light";
+  context.fillStyle = "rgba(255, 226, 176, 0.42)";
+  context.fillRect(0, 0, width, height);
+  context.globalCompositeOperation = "source-over";
+
+  const glow = context.createRadialGradient(width * 0.42, height * 0.35, 10, width * 0.5, height * 0.5, width * 0.58);
+  glow.addColorStop(0, "rgba(255, 255, 238, 0.22)");
+  glow.addColorStop(1, "rgba(255, 255, 238, 0)");
+  context.fillStyle = glow;
+  context.fillRect(0, 0, width, height);
+  drawGhibliFeatures(context, width, height);
+}
+
+function capturePhoto() {
+  if (cameraStream === null || cameraVideo.videoWidth === 0 || cameraVideo.videoHeight === 0) {
+    setCameraStatus("Start the camera before taking a photo.");
+    return;
+  }
+
+  const size = Math.min(cameraVideo.videoWidth, cameraVideo.videoHeight);
+  const sourceX = (cameraVideo.videoWidth - size) / 2;
+  const sourceY = (cameraVideo.videoHeight - size) / 2;
+  const context = cameraCanvas.getContext("2d");
+
+  context.clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
+  context.drawImage(
+    cameraVideo,
+    sourceX,
+    sourceY,
+    size,
+    size,
+    0,
+    0,
+    cameraCanvas.width,
+    cameraCanvas.height
+  );
+  stylizeGhibliPortrait(context, cameraCanvas.width, cameraCanvas.height);
+
+  facePhoto.src = cameraCanvas.toDataURL("image/png");
+  hasCapturedPhoto = true;
+  clearPhotoButton.disabled = false;
+  person.classList.add("person-has-photo");
+  setCameraStatus("Ghibli-style portrait created from your photo.");
+  stopCamera();
+}
+
+function clearPhoto() {
+  facePhoto.removeAttribute("src");
+  hasCapturedPhoto = false;
+  clearPhotoButton.disabled = true;
+  person.classList.remove("person-has-photo");
+  setCameraStatus("Use your camera to create a Ghibli-style avatar face.");
 }
 
 function updateHeightFields() {
@@ -235,6 +510,11 @@ heightUnitInput.addEventListener("change", () => {
   previousHeightUnit = heightUnitInput.value;
   updateUi();
 });
+
+startCameraButton.addEventListener("click", startCamera);
+takePhotoButton.addEventListener("click", capturePhoto);
+clearPhotoButton.addEventListener("click", clearPhoto);
+window.addEventListener("beforeunload", stopCamera);
 
 updateHeightFields();
 updateUi();

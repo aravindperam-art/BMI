@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BMI Visualizer</title>
-    <link rel="stylesheet" href="style.css?v=9" />
+    <link rel="stylesheet" href="style.css?v=10" />
   </head>
   <body>
     <main class="app-shell">
       <section class="calculator-panel" aria-labelledby="app-title">
         <div class="title-row">
-          <div>
+          <div class="brand-title">
+            <img class="runo-logo" src="assets/runo-logo.svg" alt="Runo logo" />
             <p class="eyebrow">Body Mass Index</p>
             <h1 id="app-title">BMI Visualizer</h1>
           </div>
@@ -112,6 +113,7 @@
               <div class="ear ear-left"></div>
               <div class="ear ear-right"></div>
               <div class="face">
+                <img id="face-photo" class="face-photo" alt="Captured face photo" />
                 <span class="eye eye-left"></span>
                 <span class="eye eye-right"></span>
                 <span class="nose"></span>
@@ -149,9 +151,21 @@
             Enter your details to see the body shape and weight conversions update instantly.
           </p>
         </div>
+        <div class="camera-card">
+          <div class="camera-preview">
+            <video id="camera-video" autoplay playsinline></video>
+            <p id="camera-status">Use your camera to create a Ghibli-style avatar face.</p>
+          </div>
+          <canvas id="camera-canvas" width="320" height="320" aria-hidden="true"></canvas>
+          <div class="camera-actions">
+            <button id="start-camera" type="button">Start Camera</button>
+            <button id="take-photo" type="button" disabled>Take Photo</button>
+            <button id="clear-photo" type="button" disabled>Clear Photo</button>
+          </div>
+        </div>
       </section>
     </main>
 
-    <script src="app.js?v=5"></script>
+    <script src="app.js?v=10"></script>
   </body>
 </html>
