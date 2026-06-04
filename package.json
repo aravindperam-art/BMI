@@ -1,0 +1,16 @@
+{
+  "name": "bmi-calculator",
+  "version": "1.0.0",
+  "description": "A simple JavaScript BMI calculator.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "javascript",
+    "bmi",
+    "calculator"
+  ],
+  "author": "",
+  "license": "ISC"
+}

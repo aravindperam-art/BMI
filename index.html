@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BMI Visualizer</title>
+    <link rel="stylesheet" href="style.css?v=9" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="calculator-panel" aria-labelledby="app-title">
+        <div class="title-row">
+          <div>
+            <p class="eyebrow">Body Mass Index</p>
+            <h1 id="app-title">BMI Visualizer</h1>
+          </div>
+          <div class="score-chip" id="score-chip">Ready</div>
+        </div>
+
+        <form id="bmi-form" class="form-grid">
+          <label>
+            <span>Weight</span>
+            <input id="weight" type="number" min="0" step="0.1" value="70" />
+          </label>
+
+          <label>
+            <span>Unit</span>
+            <select id="weight-unit">
+              <option value="kg">Kilograms</option>
+              <option value="g">Grams</option>
+              <option value="lb">Pounds</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Gender</span>
+            <select id="gender">
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Height Unit</span>
+            <select id="height-unit">
+              <option value="ft_in">Feet and Inches</option>
+              <option value="m">Meters</option>
+              <option value="ft">Feet</option>
+              <option value="in">Inches</option>
+            </select>
+          </label>
+
+          <div class="height-fields">
+            <label id="single-height-field">
+              <span id="single-height-label">Height</span>
+              <input id="height-value" type="number" min="0" step="0.01" value="1.73" />
+            </label>
+
+            <div class="field-pair" id="feet-inches-fields">
+              <label>
+                <span>Feet</span>
+                <input id="feet" type="number" min="0" step="1" value="5" />
+              </label>
+
+              <label>
+                <span>Inches</span>
+                <input id="inches" type="number" min="0" step="0.1" value="8" />
+              </label>
+            </div>
+          </div>
+
+          <button type="submit">Calculate BMI</button>
+        </form>
+
+        <section class="result-grid" aria-live="polite">
+          <div>
+            <span>BMI</span>
+            <strong id="bmi-value">23.46</strong>
+          </div>
+          <div>
+            <span>Category</span>
+            <strong id="category-value">Normal weight</strong>
+          </div>
+          <div>
+            <span>Gender</span>
+            <strong id="gender-value">Female</strong>
+          </div>
+          <div>
+            <span>Kilograms</span>
+            <strong id="kg-value">70.00 kg</strong>
+          </div>
+          <div>
+            <span>Grams</span>
+            <strong id="grams-value">70000 g</strong>
+          </div>
+          <div>
+            <span>Pounds</span>
+            <strong id="pounds-value">154.32 lb</strong>
+          </div>
+          <div>
+            <span>Height</span>
+            <strong id="meters-value">1.73 m</strong>
+          </div>
+        </section>
+      </section>
+
+      <section class="visual-panel" aria-label="Animated BMI body visualizer">
+        <div class="stage">
+          <div class="person person-normal" id="person">
+            <div class="avatar-head">
+              <div class="hair"></div>
+              <div class="ear ear-left"></div>
+              <div class="ear ear-right"></div>
+              <div class="face">
+                <span class="eye eye-left"></span>
+                <span class="eye eye-right"></span>
+                <span class="nose"></span>
+                <span class="smile"></span>
+              </div>
+            </div>
+            <div class="avatar-neck"></div>
+            <div class="avatar-body">
+              <div class="avatar-arm avatar-arm-left">
+                <span></span>
+              </div>
+              <div class="shirt">
+                <div class="collar"></div>
+                <div class="belly-line"></div>
+              </div>
+              <div class="avatar-arm avatar-arm-right">
+                <span></span>
+              </div>
+            </div>
+            <div class="avatar-legs">
+              <div class="avatar-leg">
+                <span></span>
+              </div>
+              <div class="avatar-leg">
+                <span></span>
+              </div>
+            </div>
+            <div class="avatar-shadow"></div>
+          </div>
+          <div class="pulse-ring"></div>
+        </div>
+        <div class="status-card">
+          <span id="visual-label">Balanced build</span>
+          <p id="visual-message">
+            Enter your details to see the body shape and weight conversions update instantly.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js?v=5"></script>
+  </body>
+</html>
